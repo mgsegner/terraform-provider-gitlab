@@ -189,6 +189,18 @@ var resourceGitLabProjectSchema = map[string]*schema.Schema{
 		Type:     schema.TypeBool,
 		Optional: true,
 	},
+	"template_name": {
+		Type:     schema.TypeString,
+		Optional: true,
+	},
+	"use_custom_template": {
+		Type:     schema.TypeBool,
+		Optional: true,
+	},
+	"group_with_project_templates_id": {
+		Type:     schema.TypeInt,
+		Optional: true,
+	},
 }
 
 func resourceGitlabProject() *schema.Resource {
@@ -300,6 +312,21 @@ func resourceGitlabProjectCreate(d *schema.ResourceData, meta interface{}) error
 	if v, ok := d.GetOk("initialize_with_readme"); ok {
 		options.InitializeWithReadme = gitlab.Bool(v.(bool))
 		setProperties = append(setProperties, "initialize_with_readme")
+	}
+
+	if v, ok := d.GetOk("template_name"); ok {
+		options.TemplateName = gitlab.String(v.(string))
+		setProperties = append(setProperties, "template_name")
+	}
+
+	if v, ok := d.GetOk("use_custom_template"); ok {
+		options.UseCustomTemplate = gitlab.Bool(v.(bool))
+		setProperties = append(setProperties, "use_custom_template")
+	}
+
+	if v, ok := d.GetOk("group_with_project_templates_id"); ok {
+		options.GroupWithProjectTemplatesID = gitlab.Int(v.(int))
+		setProperties = append(setProperties, "group_with_project_templates_id")
 	}
 
 	log.Printf("[DEBUG] create gitlab project %q", *options.Name)
