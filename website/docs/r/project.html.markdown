@@ -83,9 +83,9 @@ The following arguments are supported:
 
 * `initialize_with_readme` - (Optional) Create master branch with first commit containing a README.md file.
 
-* `template_name` - (Optional) When used without use_custom_template, name of a built-in project template. When used with use_custom_template, name of a custom project template.
+* `template_name` - (Optional) When used without use_custom_template, name of a built-in project template. When used with use_custom_template, name of a custom project template. This option is mutually exclusive with `template_project_id`.
 
-* `template_project_id` - (Optional)  When used with use_custom_template, project ID of a custom project template. This is preferable to using template_name since template_name may be ambiguous (enterprise edition).
+* `template_project_id` - (Optional)  When used with use_custom_template, project ID of a custom project template. This is preferable to using template_name since template_name may be ambiguous (enterprise edition). This option is mutually exclusive with `template_name`.
 
 * `use_custom_template` - (Optional) Use either custom instance or group (with group_with_project_templates_id) project template (enterprise edition).
 

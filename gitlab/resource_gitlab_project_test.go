@@ -222,6 +222,18 @@ func TestAccGitlabProject_templateName(t *testing.T) {
 					testAccCheckGitlabProjectDefaultBranch(&project, &testAccGitlabProjectExpectedAttributes{
 						DefaultBranch: "master",
 					}),
+					func(state *terraform.State) error {
+						client := testAccProvider.Meta().(*gitlab.Client)
+
+						projectID := state.RootModule().Resources["gitlab_project.template-name"].Primary.ID
+
+						_, _, err := client.RepositoryFiles.GetFile(projectID, "README.md", &gitlab.GetFileOptions{Ref: gitlab.String("master")}, nil)
+						if err != nil {
+							return fmt.Errorf("failed to get file from template project: %w", err)
+						}
+
+						return nil
+					},
 				),
 			},
 		},
@@ -245,6 +257,18 @@ func TestAccGitlabProject_templateNameCustom(t *testing.T) {
 					testAccCheckGitlabProjectDefaultBranch(&project, &testAccGitlabProjectExpectedAttributes{
 						DefaultBranch: "master",
 					}),
+					func(state *terraform.State) error {
+						client := testAccProvider.Meta().(*gitlab.Client)
+
+						projectID := state.RootModule().Resources["gitlab_project.template-name-custom"].Primary.ID
+
+						_, _, err := client.RepositoryFiles.GetFile(projectID, "README.md", &gitlab.GetFileOptions{Ref: gitlab.String("master")}, nil)
+						if err != nil {
+							return fmt.Errorf("failed to get file from template project: %w", err)
+						}
+
+						return nil
+					},
 				),
 			},
 		},
@@ -268,6 +292,37 @@ func TestAccGitlabProject_templateProjectID(t *testing.T) {
 					testAccCheckGitlabProjectDefaultBranch(&project, &testAccGitlabProjectExpectedAttributes{
 						DefaultBranch: "master",
 					}),
+					func(state *terraform.State) error {
+						client := testAccProvider.Meta().(*gitlab.Client)
+
+						projectID := state.RootModule().Resources["gitlab_project.template-id"].Primary.ID
+
+						_, _, err := client.RepositoryFiles.GetFile(projectID, "README.md", &gitlab.GetFileOptions{Ref: gitlab.String("master")}, nil)
+						if err != nil {
+							return fmt.Errorf("failed to get file from template project: %w", err)
+						}
+
+						return nil
+					},
+				),
+			},
+		},
+	})
+}
+
+func TestAccGitlabProject_templateMutualExclusiveNameAndID(t *testing.T) {
+	var project gitlab.Project
+	rInt := acctest.RandInt()
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:  func() { testAccPreCheck(t) },
+		Providers: testAccProviders,
+		Steps: []resource.TestStep{
+			{
+				Config:   testAccCheckMutualExclusiveNameAndID(rInt),
+				SkipFunc: isRunningInCE,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckGitlabProjectNotExists("gitlab_project.template-mutual-exclusive", &project),
 				),
 			},
 		},
@@ -492,6 +547,16 @@ func testAccCheckGitlabProjectExists(n string, project *gitlab.Project) resource
 			*project = *g
 		}
 		return err
+	}
+}
+
+func testAccCheckGitlabProjectNotExists(n string, project *gitlab.Project) resource.TestCheckFunc {
+	return func(s *terraform.State) error {
+		_, ok := s.RootModule().Resources[n]
+		if ok {
+			return fmt.Errorf("Found project: %s", n)
+		}
+		return nil
 	}
 }
 
@@ -823,6 +888,20 @@ resource "gitlab_project" "template-id" {
   name = "template-id-%d"
   path = "template-id.%d"
   description = "Terraform acceptance tests"
+  template_project_id = 999
+  use_custom_template = true
+  default_branch = "master"
+}
+	`, rInt, rInt)
+}
+
+func testAccCheckMutualExclusiveNameAndID(rInt int) string {
+	return fmt.Sprintf(`
+resource "gitlab_project" "template-mutual-exclusive" {
+  name = "template-mutual-exclusive-%d"
+  path = "template-mutual-exclusive.%d"
+  description = "Terraform acceptance tests"
+  template_name = "rails"
   template_project_id = 999
   use_custom_template = true
   default_branch = "master"

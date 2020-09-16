@@ -325,6 +325,10 @@ func resourceGitlabProjectCreate(d *schema.ResourceData, meta interface{}) error
 		options.TemplateProjectID = gitlab.Int(v.(int))
 	}
 
+	if options.TemplateName != nil && options.TemplateProjectID != nil {
+		return fmt.Errorf("Error creating project %q: template_name and template_project_id are mutually exclusive", *options.Name)
+	}
+
 	if v, ok := d.GetOk("use_custom_template"); ok {
 		options.UseCustomTemplate = gitlab.Bool(v.(bool))
 	}
