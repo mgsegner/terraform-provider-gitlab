@@ -229,9 +229,6 @@ func TestAccGitlabProject_templateName(t *testing.T) {
 }
 
 func TestAccGitlabProject_templateNameCustom(t *testing.T) {
-	if v := os.Getenv("GITLAB_EE"); v == "no" {
-		return
-	}
 	var project gitlab.Project
 	rInt := acctest.RandInt()
 
@@ -241,7 +238,8 @@ func TestAccGitlabProject_templateNameCustom(t *testing.T) {
 		CheckDestroy: testAccCheckGitlabProjectDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccGitlabProjectConfigTemplateNameCustom(rInt),
+				Config:   testAccGitlabProjectConfigTemplateNameCustom(rInt),
+				SkipFunc: isRunningInCE,
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckGitlabProjectExists("gitlab_project.template-name-custom", &project),
 					testAccCheckGitlabProjectDefaultBranch(&project, &testAccGitlabProjectExpectedAttributes{
@@ -254,9 +252,6 @@ func TestAccGitlabProject_templateNameCustom(t *testing.T) {
 }
 
 func TestAccGitlabProject_templateProjectID(t *testing.T) {
-	if v := os.Getenv("GITLAB_EE"); v == "no" {
-		return
-	}
 	var project gitlab.Project
 	rInt := acctest.RandInt()
 
@@ -266,7 +261,8 @@ func TestAccGitlabProject_templateProjectID(t *testing.T) {
 		CheckDestroy: testAccCheckGitlabProjectDestroy,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccGitlabProjectConfigTemplateProjectID(rInt),
+				Config:   testAccGitlabProjectConfigTemplateProjectID(rInt),
+				SkipFunc: isRunningInCE,
 				Check: resource.ComposeTestCheckFunc(
 					testAccCheckGitlabProjectExists("gitlab_project.template-id", &project),
 					testAccCheckGitlabProjectDefaultBranch(&project, &testAccGitlabProjectExpectedAttributes{
