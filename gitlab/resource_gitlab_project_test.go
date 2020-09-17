@@ -283,6 +283,12 @@ func TestAccGitlabProject_templates(t *testing.T) {
 					},
 				),
 			},
+			// Step3 Ensure that template name and template project id are mutually exclusive
+			{
+				Config:      testAccCheckMutualExclusiveNameAndID(rInt),
+				SkipFunc:    isRunningInCE,
+				ExpectError: regexp.MustCompile(regexp.QuoteMeta("\"template_project_id\": conflicts with template_name")),
+			},
 		},
 	})
 }
