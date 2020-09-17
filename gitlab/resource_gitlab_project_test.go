@@ -206,7 +206,7 @@ func TestAccGitlabProject_initializeWithReadme(t *testing.T) {
 	})
 }
 
-func TestAccGitlabProject_templateName(t *testing.T) {
+func TestAccGitlabProject_templates(t *testing.T) {
 	var project gitlab.Project
 	rInt := acctest.RandInt()
 
@@ -215,6 +215,7 @@ func TestAccGitlabProject_templateName(t *testing.T) {
 		Providers:    testAccProviders,
 		CheckDestroy: testAccCheckGitlabProjectDestroy,
 		Steps: []resource.TestStep{
+			// Step0 Create a project using template name
 			{
 				Config: testAccGitlabProjectConfigTemplateName(rInt),
 				Check: resource.ComposeTestCheckFunc(
@@ -227,28 +228,16 @@ func TestAccGitlabProject_templateName(t *testing.T) {
 
 						projectID := state.RootModule().Resources["gitlab_project.template-name"].Primary.ID
 
-						_, _, err := client.RepositoryFiles.GetFile(projectID, "README.md", &gitlab.GetFileOptions{Ref: gitlab.String("master")}, nil)
+						_, _, err := client.RepositoryFiles.GetFile(projectID, ".ruby-version", &gitlab.GetFileOptions{Ref: gitlab.String("master")}, nil)
 						if err != nil {
-							return fmt.Errorf("failed to get file from template project: %w", err)
+							return fmt.Errorf("failed to get '.ruby-version' file from template project: %w", err)
 						}
 
 						return nil
 					},
 				),
 			},
-		},
-	})
-}
-
-func TestAccGitlabProject_templateNameCustom(t *testing.T) {
-	var project gitlab.Project
-	rInt := acctest.RandInt()
-
-	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckGitlabProjectDestroy,
-		Steps: []resource.TestStep{
+			// Step1 Create a project using custom template name
 			{
 				Config:   testAccGitlabProjectConfigTemplateNameCustom(rInt),
 				SkipFunc: isRunningInCE,
@@ -262,28 +251,16 @@ func TestAccGitlabProject_templateNameCustom(t *testing.T) {
 
 						projectID := state.RootModule().Resources["gitlab_project.template-name-custom"].Primary.ID
 
-						_, _, err := client.RepositoryFiles.GetFile(projectID, "README.md", &gitlab.GetFileOptions{Ref: gitlab.String("master")}, nil)
+						_, _, err := client.RepositoryFiles.GetFile(projectID, "Gemfile", &gitlab.GetFileOptions{Ref: gitlab.String("master")}, nil)
 						if err != nil {
-							return fmt.Errorf("failed to get file from template project: %w", err)
+							return fmt.Errorf("failed to get 'Gemfile' file from template project: %w", err)
 						}
 
 						return nil
 					},
 				),
 			},
-		},
-	})
-}
-
-func TestAccGitlabProject_templateProjectID(t *testing.T) {
-	var project gitlab.Project
-	rInt := acctest.RandInt()
-
-	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckGitlabProjectDestroy,
-		Steps: []resource.TestStep{
+			// Step2 Create a project using custom template project id
 			{
 				Config:   testAccGitlabProjectConfigTemplateProjectID(rInt),
 				SkipFunc: isRunningInCE,
@@ -297,32 +274,13 @@ func TestAccGitlabProject_templateProjectID(t *testing.T) {
 
 						projectID := state.RootModule().Resources["gitlab_project.template-id"].Primary.ID
 
-						_, _, err := client.RepositoryFiles.GetFile(projectID, "README.md", &gitlab.GetFileOptions{Ref: gitlab.String("master")}, nil)
+						_, _, err := client.RepositoryFiles.GetFile(projectID, "Rakefile", &gitlab.GetFileOptions{Ref: gitlab.String("master")}, nil)
 						if err != nil {
-							return fmt.Errorf("failed to get file from template project: %w", err)
+							return fmt.Errorf("failed to get 'Rakefile' file from template project: %w", err)
 						}
 
 						return nil
 					},
-				),
-			},
-		},
-	})
-}
-
-func TestAccGitlabProject_templateMutualExclusiveNameAndID(t *testing.T) {
-	var project gitlab.Project
-	rInt := acctest.RandInt()
-
-	resource.Test(t, resource.TestCase{
-		PreCheck:  func() { testAccPreCheck(t) },
-		Providers: testAccProviders,
-		Steps: []resource.TestStep{
-			{
-				Config:   testAccCheckMutualExclusiveNameAndID(rInt),
-				SkipFunc: isRunningInCE,
-				Check: resource.ComposeTestCheckFunc(
-					testAccCheckGitlabProjectNotExists("gitlab_project.template-mutual-exclusive", &project),
 				),
 			},
 		},
@@ -869,6 +827,12 @@ resource "gitlab_project" "template-name" {
 	`, rInt, rInt)
 }
 
+// 2020-09-07: Currently Gitlab (version 13.3.6 ) doesn't allow in admin API
+// ability to set a group as instance level templates.
+// To test resource_gitlab_project_test template features we add
+// group, project myrails and admin settings directly in scripts/start-gitlab.sh
+// Once Gitlab add admin template in API we could manage group/project/settings
+// directly in tests like TestAccGitlabProject_basic.
 func testAccGitlabProjectConfigTemplateNameCustom(rInt int) string {
 	return fmt.Sprintf(`
 resource "gitlab_project" "template-name-custom" {

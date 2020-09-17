@@ -209,12 +209,16 @@ var resourceGitLabProjectSchema = map[string]*schema.Schema{
 		Optional: true,
 	},
 	"template_name": {
-		Type:     schema.TypeString,
-		Optional: true,
+		Type:          schema.TypeString,
+		Optional:      true,
+		ConflictsWith: []string{"template_project_id"},
+		ForceNew:      true,
 	},
 	"template_project_id": {
-		Type:     schema.TypeInt,
-		Optional: true,
+		Type:          schema.TypeInt,
+		Optional:      true,
+		ConflictsWith: []string{"template_name"},
+		ForceNew:      true,
 	},
 	"use_custom_template": {
 		Type:     schema.TypeBool,
@@ -323,10 +327,6 @@ func resourceGitlabProjectCreate(d *schema.ResourceData, meta interface{}) error
 
 	if v, ok := d.GetOk("template_project_id"); ok {
 		options.TemplateProjectID = gitlab.Int(v.(int))
-	}
-
-	if options.TemplateName != nil && options.TemplateProjectID != nil {
-		return fmt.Errorf("Error creating project %q: template_name and template_project_id are mutually exclusive", *options.Name)
 	}
 
 	if v, ok := d.GetOk("use_custom_template"); ok {
