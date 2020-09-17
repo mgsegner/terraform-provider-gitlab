@@ -180,6 +180,74 @@ func TestAccGitlabProject_basic(t *testing.T) {
 					testAccCheckAggregateGitlabProject(&defaultsMasterBranch, &received),
 				),
 			},
+			// Step7 Create a project using template name
+			{
+				Config: testAccGitlabProjectConfigTemplateName(rInt),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckGitlabProjectExists("gitlab_project.template-name", &received),
+					testAccCheckGitlabProjectDefaultBranch(&received, &testAccGitlabProjectExpectedAttributes{
+						DefaultBranch: "master",
+					}),
+					func(state *terraform.State) error {
+						client := testAccProvider.Meta().(*gitlab.Client)
+
+						projectID := state.RootModule().Resources["gitlab_project.template-name"].Primary.ID
+
+						_, _, err := client.RepositoryFiles.GetFile(projectID, ".ruby-version", &gitlab.GetFileOptions{Ref: gitlab.String("master")}, nil)
+						if err != nil {
+							return fmt.Errorf("failed to get '.ruby-version' file from template project: %w", err)
+						}
+
+						return nil
+					},
+				),
+			},
+			// Step8 Create a project using custom template name
+			{
+				Config:   testAccGitlabProjectConfigTemplateNameCustom(rInt),
+				SkipFunc: isRunningInCE,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckGitlabProjectExists("gitlab_project.template-name-custom", &received),
+					testAccCheckGitlabProjectDefaultBranch(&received, &testAccGitlabProjectExpectedAttributes{
+						DefaultBranch: "master",
+					}),
+					func(state *terraform.State) error {
+						client := testAccProvider.Meta().(*gitlab.Client)
+
+						projectID := state.RootModule().Resources["gitlab_project.template-name-custom"].Primary.ID
+
+						_, _, err := client.RepositoryFiles.GetFile(projectID, "Gemfile", &gitlab.GetFileOptions{Ref: gitlab.String("master")}, nil)
+						if err != nil {
+							return fmt.Errorf("failed to get 'Gemfile' file from template project: %w", err)
+						}
+
+						return nil
+					},
+				),
+			},
+			// Step9 Create a project using custom template project id
+			{
+				Config:   testAccGitlabProjectConfigTemplateProjectID(rInt),
+				SkipFunc: isRunningInCE,
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckGitlabProjectExists("gitlab_project.template-id", &received),
+					testAccCheckGitlabProjectDefaultBranch(&received, &testAccGitlabProjectExpectedAttributes{
+						DefaultBranch: "master",
+					}),
+					func(state *terraform.State) error {
+						client := testAccProvider.Meta().(*gitlab.Client)
+
+						projectID := state.RootModule().Resources["gitlab_project.template-id"].Primary.ID
+
+						_, _, err := client.RepositoryFiles.GetFile(projectID, "Rakefile", &gitlab.GetFileOptions{Ref: gitlab.String("master")}, nil)
+						if err != nil {
+							return fmt.Errorf("failed to get 'Rakefile' file from template project: %w", err)
+						}
+
+						return nil
+					},
+				),
+			},
 		},
 	})
 }
@@ -206,84 +274,13 @@ func TestAccGitlabProject_initializeWithReadme(t *testing.T) {
 	})
 }
 
-func TestAccGitlabProject_templates(t *testing.T) {
-	var project gitlab.Project
+func TestAccGitlabProjec_templateMutualExclusiveNameAndID(t *testing.T) {
 	rInt := acctest.RandInt()
 
 	resource.Test(t, resource.TestCase{
-		PreCheck:     func() { testAccPreCheck(t) },
-		Providers:    testAccProviders,
-		CheckDestroy: testAccCheckGitlabProjectDestroy,
+		PreCheck:  func() { testAccPreCheck(t) },
+		Providers: testAccProviders,
 		Steps: []resource.TestStep{
-			// Step0 Create a project using template name
-			{
-				Config: testAccGitlabProjectConfigTemplateName(rInt),
-				Check: resource.ComposeTestCheckFunc(
-					testAccCheckGitlabProjectExists("gitlab_project.template-name", &project),
-					testAccCheckGitlabProjectDefaultBranch(&project, &testAccGitlabProjectExpectedAttributes{
-						DefaultBranch: "master",
-					}),
-					func(state *terraform.State) error {
-						client := testAccProvider.Meta().(*gitlab.Client)
-
-						projectID := state.RootModule().Resources["gitlab_project.template-name"].Primary.ID
-
-						_, _, err := client.RepositoryFiles.GetFile(projectID, ".ruby-version", &gitlab.GetFileOptions{Ref: gitlab.String("master")}, nil)
-						if err != nil {
-							return fmt.Errorf("failed to get '.ruby-version' file from template project: %w", err)
-						}
-
-						return nil
-					},
-				),
-			},
-			// Step1 Create a project using custom template name
-			{
-				Config:   testAccGitlabProjectConfigTemplateNameCustom(rInt),
-				SkipFunc: isRunningInCE,
-				Check: resource.ComposeTestCheckFunc(
-					testAccCheckGitlabProjectExists("gitlab_project.template-name-custom", &project),
-					testAccCheckGitlabProjectDefaultBranch(&project, &testAccGitlabProjectExpectedAttributes{
-						DefaultBranch: "master",
-					}),
-					func(state *terraform.State) error {
-						client := testAccProvider.Meta().(*gitlab.Client)
-
-						projectID := state.RootModule().Resources["gitlab_project.template-name-custom"].Primary.ID
-
-						_, _, err := client.RepositoryFiles.GetFile(projectID, "Gemfile", &gitlab.GetFileOptions{Ref: gitlab.String("master")}, nil)
-						if err != nil {
-							return fmt.Errorf("failed to get 'Gemfile' file from template project: %w", err)
-						}
-
-						return nil
-					},
-				),
-			},
-			// Step2 Create a project using custom template project id
-			{
-				Config:   testAccGitlabProjectConfigTemplateProjectID(rInt),
-				SkipFunc: isRunningInCE,
-				Check: resource.ComposeTestCheckFunc(
-					testAccCheckGitlabProjectExists("gitlab_project.template-id", &project),
-					testAccCheckGitlabProjectDefaultBranch(&project, &testAccGitlabProjectExpectedAttributes{
-						DefaultBranch: "master",
-					}),
-					func(state *terraform.State) error {
-						client := testAccProvider.Meta().(*gitlab.Client)
-
-						projectID := state.RootModule().Resources["gitlab_project.template-id"].Primary.ID
-
-						_, _, err := client.RepositoryFiles.GetFile(projectID, "Rakefile", &gitlab.GetFileOptions{Ref: gitlab.String("master")}, nil)
-						if err != nil {
-							return fmt.Errorf("failed to get 'Rakefile' file from template project: %w", err)
-						}
-
-						return nil
-					},
-				),
-			},
-			// Step3 Ensure that template name and template project id are mutually exclusive
 			{
 				Config:      testAccCheckMutualExclusiveNameAndID(rInt),
 				SkipFunc:    isRunningInCE,
