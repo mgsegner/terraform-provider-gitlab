@@ -137,6 +137,10 @@ var resourceGitLabProjectSchema = map[string]*schema.Schema{
 		Type:     schema.TypeString,
 		Computed: true,
 	},
+	"import_url": {
+		Type:     schema.TypeString,
+		Optional: true,
+	},
 	"web_url": {
 		Type:     schema.TypeString,
 		Computed: true,
@@ -314,6 +318,10 @@ func resourceGitlabProjectCreate(d *schema.ResourceData, meta interface{}) error
 		setProperties = append(setProperties, "initialize_with_readme")
 	}
 
+	if v, ok := d.GetOk("import_url"); ok {
+		options.ImportURL = gitlab.String(v.(string))
+	}
+
 	if v, ok := d.GetOk("template_name"); ok {
 		options.TemplateName = gitlab.String(v.(string))
 		setProperties = append(setProperties, "template_name")
@@ -344,6 +352,35 @@ func resourceGitlabProjectCreate(d *schema.ResourceData, meta interface{}) error
 	// from this point onwards no matter how we return, resource creation
 	// is committed to state since we set its ID
 	d.SetId(fmt.Sprintf("%d", project.ID))
+
+	// An import can be triggered by import_url or by creating the project from a template.
+	if project.ImportStatus != "none" {
+		log.Printf("[DEBUG] waiting for project %q import to finish", *options.Name)
+
+		stateConf := &resource.StateChangeConf{
+			Pending: []string{"scheduled", "started"},
+			Target:  []string{"finished"},
+			Timeout: 10 * time.Minute,
+			Refresh: func() (interface{}, string, error) {
+				status, _, err := client.ProjectImportExport.ImportStatus(d.Id())
+				if err != nil {
+					return nil, "", err
+				}
+
+				return status, status.ImportStatus, nil
+			},
+		}
+
+		if _, err := stateConf.WaitForState(); err != nil {
+			return fmt.Errorf("error while waiting for project %q import to finish: %w", *options.Name, err)
+		}
+
+		// Read the project again, so that we can detect the default branch.
+		project, _, err = client.Projects.GetProject(project.ID, nil)
+		if err != nil {
+			return fmt.Errorf("Failed to get project %q after completing import: %w", d.Id(), err)
+		}
+	}
 
 	if v, ok := d.GetOk("shared_with_groups"); ok {
 		for _, option := range expandSharedWithGroupsOptions(v) {
