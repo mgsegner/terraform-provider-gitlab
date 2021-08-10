@@ -38,29 +38,7 @@ var resourceGitLabProjectSchema = map[string]*schema.Schema{
 	"default_branch": {
 		Type:     schema.TypeString,
 		Optional: true,
-		DiffSuppressFunc: func(k, old, new string, d *schema.ResourceData) bool {
-			// If the old default branch is empty, it means that the project does not
-			// have a default branch. This can only happen if the project does not have
-			// branches, i.e. it is an empty project. In that case it is useless to
-			// try setting a specific default branch (because no branch exists).
-			// This code will defer the setting of a default branch to a time when the
-			// project is no longer empty.
-			if old == "" {
-				return true
-			}
-
-			// Once the initialize_with_readme attribute is set to true, Gitlab creates
-			// a master branch and sets it as default. If the Gitlab project resource
-			// doesn't have default_branch attribute specified, Terraform will
-			// force "master" => "" on the next run.
-			if v, ok := d.GetOk("initialize_with_readme"); ok {
-				if new == "" && v == true {
-					return true
-				}
-			}
-
-			return old == new
-		},
+		Computed: true,
 	},
 	"request_access_enabled": {
 		Type:     schema.TypeBool,
@@ -363,6 +341,62 @@ func resourceGitlabProjectCreate(d *schema.ResourceData, meta interface{}) error
 			return err
 		}
 		d.SetPartial(("archived"))
+	}
+
+	// default_branch cannot always be set during creation.
+	// If the branch does not exist, the update will fail, so we also create it here.
+	// See: https://gitlab.com/gitlab-org/gitlab/-/issues/333426
+	// This logic may be removed when the above issue is resolved.
+	db, e := d.GetOk("default_branch")
+	if e {
+		log.Printf("[DEBUG] Error getting default_branch %+v", e)
+	}
+	log.Printf("[DEBUG] Testing %q == %q for project %q", project.DefaultBranch, db.(string), d.Id())
+	if v, ok := d.GetOk("default_branch"); ok && project.DefaultBranch != "" && project.DefaultBranch != v.(string) {
+		oldDefaultBranch := project.DefaultBranch
+		newDefaultBranch := v.(string)
+
+		if _, _, err := client.Branches.GetBranch(project.ID, newDefaultBranch, nil); err != nil {
+			log.Printf("[DEBUG] create branch %q for project %q", newDefaultBranch, d.Id())
+			_, _, err := client.Branches.CreateBranch(project.ID, &gitlab.CreateBranchOptions{
+				Branch: gitlab.String(newDefaultBranch),
+				Ref:    gitlab.String(oldDefaultBranch),
+			})
+			if err != nil {
+				return fmt.Errorf("Failed to create branch %q for project %q: %w", newDefaultBranch, d.Id(), err)
+			}
+
+		} else {
+			log.Printf("[DEBUG] Default branch %q already exists for project %q", newDefaultBranch, d.Id())
+		}
+
+		log.Printf("[DEBUG] set new default branch to %q for project %q", newDefaultBranch, d.Id())
+		_, _, err = client.Projects.EditProject(project.ID, &gitlab.EditProjectOptions{
+			DefaultBranch: gitlab.String(newDefaultBranch),
+		})
+		if err != nil {
+			return fmt.Errorf("Failed to set default branch to %q for project %q: %w", newDefaultBranch, d.Id(), err)
+		}
+
+		log.Printf("[DEBUG] protect new default branch %q for project %q", newDefaultBranch, d.Id())
+		_, _, err = client.ProtectedBranches.ProtectRepositoryBranches(project.ID, &gitlab.ProtectRepositoryBranchesOptions{
+			Name: gitlab.String(newDefaultBranch),
+		})
+		if err != nil {
+			return fmt.Errorf("Failed to protect default branch %q for project %q: %w", newDefaultBranch, d.Id(), err)
+		}
+
+		log.Printf("[DEBUG] unprotect old default branch %q for project %q", oldDefaultBranch, d.Id())
+		_, err = client.ProtectedBranches.UnprotectRepositoryBranches(project.ID, oldDefaultBranch)
+		if err != nil {
+			return fmt.Errorf("Failed to unprotect undesired default branch %q for project %q: %w", oldDefaultBranch, d.Id(), err)
+		}
+
+		log.Printf("[DEBUG] delete old default branch %q for project %q", oldDefaultBranch, d.Id())
+		_, err = client.Branches.DeleteBranch(project.ID, oldDefaultBranch)
+		if err != nil {
+			return fmt.Errorf("Failed to clean up undesired default branch %q for project %q: %w", oldDefaultBranch, d.Id(), err)
+		}
 	}
 
 	// everything went OK, we can revert to ordinary state management
